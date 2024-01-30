@@ -4,3 +4,4 @@ librosa
 numpy
 wandb
 torch
+python_speech_features
