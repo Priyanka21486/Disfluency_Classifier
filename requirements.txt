@@ -3,3 +3,4 @@ tqdm
 librosa
 numpy
 wandb
+torch
