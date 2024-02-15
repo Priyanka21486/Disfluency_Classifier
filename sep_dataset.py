@@ -7,37 +7,37 @@ import random
 from typing import Literal
 import torch
 
-class SEP_Binary_Dataset(torch.utils.data.Dataset):
-    SRC_DIR = "/home/priyanka/Desktop/MS_FINAL/SSP/SEP28K"
+class SEP_Dataset(torch.utils.data.Dataset):
+    SRC_DIR = "/home/priyanka/Desktop/MS_FINAL/SEP28K"
     FS = 16000
     AUDIO_DUR = 3
     WIN_LEN = 320 # 20 ms
     HOP_LEN = 160 # 10 ms
-    DISFLUENCY_TYPE = Literal["Interjection", "Prolongation", "WordRep"]
+    LABEL_TYPE = Literal["Interjection", "Prolongation", "WordRep", "Fluent", "SoundRep"]
 
-    def __init__(self, disfluency_type: DISFLUENCY_TYPE):
-        self.disfluency_path = os.path.join(self.SRC_DIR, disfluency_type)
-        self.fluent_path = os.path.join(self.SRC_DIR, "Fluent")
-        self.disfluency_data = list(Path(self.disfluency_path).glob("*.wav"))
-        self.fluent_data = list(Path(self.fluent_path).glob("*.wav"))
-        print(f"Found {len(self.disfluency_data)} samples in disfluency directory ({self.disfluency_path})")
-        print(f"Found {len(self.fluent_data)} samples in fluent directory ({self.fluent_path})")
-        self._balance_data()
-        self.total_data = [(sample, 1) for sample in self.disfluency_data]
-        self.total_data += [(sample, 0) for sample in self.fluent_data]
-        # random.shuffle(self.total_data)
+    def __init__(self, class_a: LABEL_TYPE, class_b: LABEL_TYPE, do_shuffle: bool = True):
+        src_path_a = os.path.join(self.SRC_DIR, class_a)
+        src_path_b = os.path.join(self.SRC_DIR, class_b)
+        data_a = list(Path(src_path_a).glob("*.wav"))
+        data_b = list(Path(src_path_b).glob("*.wav"))
+        print(f"Found {len(data_a)} samples in class_a: {class_a} ({src_path_a})")
+        print(f"Found {len(data_b)} samples in class_b: {class_b} ({src_path_b})")
+        print(f"Total samples: {len(data_a) + len(data_b)}")
+        if do_shuffle:
+            random.shuffle(data_a)
+            random.shuffle(data_b)
+        data_a = data_a[: min(len(data_a), len(data_b))]
+        data_b = data_b[: len(data_a)]
+        self.data = [(sample, 0) for sample in data_a] + [(sample, 1) for sample in data_b]
+        print(f"After balancing, total samples: {len(self.data)} (each class: {len(data_a)})")
+        if do_shuffle:
+            random.shuffle(self.data)
     
-    def _balance_data(self):
-        min_len = min(len(self.disfluency_data), len(self.fluent_data))
-        self.disfluency_data = random.sample(self.disfluency_data, k=min_len)
-        self.fluent_data = random.sample(self.fluent_data, k=min_len)
-        print(f"Balancing data -> disfluency: {len(self.disfluency_data)}, fluent: {len(self.fluent_data)}")
-
     def __len__(self):
-        return len(self.total_data)
+        return len(self.data)
 
     def __getitem__(self, ind):
-        wav_path, label = self.total_data[ind]
+        wav_path, label = self.data[ind]
         wav = self._load_audio(wav_path)
         feats = self._extract_features(wav)
         return feats, label
@@ -70,7 +70,10 @@ class SEP_Binary_Dataset(torch.utils.data.Dataset):
         return feats, labels
 
 if __name__ == "__main__":
-    dataset = SEP_Binary_Dataset(disfluency_type="WordRep")
+    dataset = SEP_Dataset(
+        class_a="SoundRep",
+        class_b="Fluent"
+    )
     print(len(dataset))
     feats, label = dataset[0]
     print(feats.shape, label)
